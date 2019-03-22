@@ -153,6 +153,16 @@ RCT_EXPORT_METHOD(restorePurchases:(RCTResponseSenderBlock)callback)
 RCT_EXPORT_METHOD(loadProducts:(NSArray *)productIdentifiers
                   callback:(RCTResponseSenderBlock)callback)
 {
+  NSArray* transactions = [SKPaymentQueue defaultQueue].transactions;
+  if (transactions.count > 0) {
+    //检测是否有未完成的交易
+    SKPaymentTransaction* transaction = [transactions firstObject];
+    if (transaction.transactionState == SKPaymentTransactionStatePurchased) {
+      [[SKPaymentQueue defaultQueue] finishTransaction:transaction];
+      return;
+    }
+  }
+  
   if([SKPaymentQueue canMakePayments]){
     SKProductsRequest *productsRequest = [[SKProductsRequest alloc]
                                           initWithProductIdentifiers:[NSSet setWithArray:productIdentifiers]];
@@ -176,7 +186,11 @@ RCT_EXPORT_METHOD(loadProducts:(NSArray *)productIdentifiers
         if (callback) {
           if(transaction.error.code != SKErrorPaymentCancelled){
             NSLog(@"购买失败");
-            callback(@[@"购买失败"]);
+            if(transaction.error.userInfo) {
+              callback(@[transaction.error.userInfo[@"NSLocalizedDescription"]]);
+            } else {
+              callback(@[@"购买失败"]);
+            }
           } else {
             NSLog(@"购买取消");
             callback(@[@"购买取消"]);
